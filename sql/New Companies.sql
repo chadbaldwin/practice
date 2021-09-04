@@ -44,7 +44,7 @@ IF OBJECT_ID('dbo.Senior_Manager','U') IS NULL
 BEGIN;
 	-- DROP TABLE dbo.Senior_Manager
 	CREATE TABLE dbo.Senior_Manager (
-		senior_manager_code varchar(20) NOT NULL CONSTRAINT PK_Senior_Manager PRIMARY KEY CLUSTERED,
+		senior_manager_code	varchar(20) NOT NULL CONSTRAINT PK_Senior_Manager PRIMARY KEY CLUSTERED,
 		lead_manager_code	varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Lead_Manager (lead_manager_code),
 		company_code		varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Company (company_code),
 	);
@@ -55,7 +55,7 @@ BEGIN;
 	-- DROP TABLE dbo.Manager
 	CREATE TABLE dbo.Manager (
 		manager_code		varchar(20) NOT NULL CONSTRAINT PK_Manager PRIMARY KEY CLUSTERED,
-		senior_manager_code varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Senior_Manager (senior_manager_code),
+		senior_manager_code	varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Senior_Manager (senior_manager_code),
 		lead_manager_code	varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Lead_Manager (lead_manager_code),
 		company_code		varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Company (company_code),
 	);
@@ -67,7 +67,7 @@ BEGIN;
 	CREATE TABLE dbo.Employee (
 		employee_code		varchar(20) NOT NULL CONSTRAINT PK_Employee PRIMARY KEY CLUSTERED,
 		manager_code		varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Manager (manager_code),
-		senior_manager_code varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Senior_Manager (senior_manager_code),
+		senior_manager_code	varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Senior_Manager (senior_manager_code),
 		lead_manager_code	varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Lead_Manager (lead_manager_code),
 		company_code		varchar(20) NOT NULL FOREIGN KEY REFERENCES dbo.Company (company_code),
 	);
