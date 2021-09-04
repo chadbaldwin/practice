@@ -26,8 +26,8 @@ IF OBJECT_ID('dbo.Company','U') IS NULL
 BEGIN;
 	-- DROP TABLE dbo.Company
 	CREATE TABLE dbo.Company (
-		company_code varchar(20) NOT NULL CONSTRAINT PK_Company PRIMARY KEY CLUSTERED,
-		founder varchar(20) NOT NULL,
+		company_code		varchar(20) NOT NULL CONSTRAINT PK_Company PRIMARY KEY CLUSTERED,
+		founder				varchar(20) NOT NULL,
 	);
 END;
 
