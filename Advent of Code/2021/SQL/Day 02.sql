@@ -35,7 +35,7 @@ FROM #rawdata d
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
-SELECT SUM(IIF(d.Direction = 'V', d.Distance, NULL)) * SUM(IIF(d.Direction = 'H', d.Distance, NULL))
+SELECT Answer = SUM(IIF(d.Direction = 'V', d.Distance, NULL)) * SUM(IIF(d.Direction = 'H', d.Distance, NULL))
 FROM #data d
 ------------------------------------------------------------------------------
 
@@ -45,11 +45,19 @@ FROM #data d
 -- Horizontal Position (sum of "forward")
 -- Aim (sum of "up" + "down")
 
-SELECT MAX(x.HPos) * SUM(IIF(x.Direction = 'H', x.Distance * x.Aim, 0))
+SELECT Answer = MAX(x.HPos) * SUM(IIF(x.Direction = 'H', x.Distance * x.Aim, 0))
 FROM (
 	SELECT d.ID, d.Direction, d.Distance
 		, Aim = SUM(IIF(d.Direction = 'V', d.Distance, 0)) OVER (ORDER BY d.ID)
 		, HPos = SUM(IIF(d.Direction = 'H', d.Distance, 0)) OVER (ORDER BY d.ID)
+	FROM #data d
+) x
+
+-- Alternative solution - discovered after using first solution to find answer
+SELECT Answer = SUM(IIF(x.Direction = 'H', x.Distance, 0)) * SUM(IIF(x.Direction = 'H', x.Distance * x.Aim, 0))
+FROM (
+	SELECT d.Direction, d.Distance
+		, Aim = SUM(IIF(d.Direction = 'V', d.Distance, 0)) OVER (ORDER BY d.ID)
 	FROM #data d
 ) x
 ------------------------------------------------------------------------------
