@@ -46,7 +46,7 @@
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
-	SELECT TOP(1) x.Position, TotalFuel = SUM(x.Fuel)
+	SELECT TOP(1) Answer = SUM(x.Fuel)
 	FROM (
 		SELECT p.Position, r.Val, Fuel = ABS(r.Val - p.Position)
 		FROM #Positions p
@@ -60,7 +60,7 @@
 -- Part 2
 ------------------------------------------------------------------------------
 	-- Same thing as part 1, just need to use the formula `((n + 1) * n) / 2` to calculate fuel
-	SELECT TOP(1) x.Position, TotalFuel = SUM(x.Fuel)
+	SELECT TOP(1) Answer = SUM(x.Fuel)
 	FROM (
 		SELECT p.Position, r.Val, Fuel = ((ABS(r.Val - p.Position) + 1) * ABS(r.Val - p.Position)) / 2
 		FROM #Positions p

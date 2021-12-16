@@ -26,6 +26,11 @@ SET NOCOUNT ON;
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
+	IF OBJECT_ID('tempdb..#part1_data','U') IS NOT NULL DROP TABLE #part1_data; --SELECT * FROM #part1_data
+	SELECT r.ID, r.Val
+	INTO #part1_data
+	FROM #rawdata r;
+
 	-- There might be a way to accomplish this with a tally table, but I'm just going to brute force it to see what Part 2 requires
 
 	DECLARE @c int = 0, @i int;
@@ -39,25 +44,25 @@ SET NOCOUNT ON;
 		IF (@c > @i) BREAK;
 
 		UPDATE r SET r.Val -= 1
-		FROM #rawdata r;
+		FROM #part1_data r;
 
-		IF EXISTS (SELECT * FROM #rawdata r WHERE r.Val = -1)
+		IF EXISTS (SELECT * FROM #part1_data r WHERE r.Val = -1)
 		BEGIN;
-			INSERT INTO #rawdata (Val)
+			INSERT INTO #part1_data (Val)
 			SELECT 8
-			FROM #rawdata r	
+			FROM #part1_data r	
 			WHERE r.Val = -1;
 
 			UPDATE r SET r.Val = 6
-			FROM #rawdata r	
+			FROM #part1_data r	
 			WHERE r.Val = -1;
 		END;
 
 		RAISERROR('.',0,1) WITH NOWAIT;
 	END;
 
-	SELECT FORMAT(COUNT(*),'N0')
-	FROM #rawdata r;
+	SELECT Answer = COUNT(*)
+	FROM #part1_data r;
 ------------------------------------------------------------------------------
 GO
 ------------------------------------------------------------------------------
@@ -73,15 +78,15 @@ GO
 		Then loop on the buckets, adding / re-arranging appropriately.
 	*/
 
-	IF OBJECT_ID('tempdb..#data','U') IS NOT NULL DROP TABLE #data; --SELECT * FROM #data
-	CREATE TABLE #data (Timer int NOT NULL, FishCount bigint NOT NULL);
+	IF OBJECT_ID('tempdb..#part2_data','U') IS NOT NULL DROP TABLE #part2_data; --SELECT * FROM #part2_data
+	CREATE TABLE #part2_data (Timer int NOT NULL, FishCount bigint NOT NULL);
 
-	INSERT INTO #data (Timer, FishCount)
+	INSERT INTO #part2_data (Timer, FishCount)
 	SELECT Timer = r.Val, FishCount = COUNT(*)
 	FROM #rawdata r
 	GROUP BY r.Val;
 
-	DECLARE @c int = 0, @i int;
+	DECLARE @c int = 0, @i int = 0;
 	DECLARE @AddCount bigint = 0;
 
 	SET @i = 256;
@@ -93,35 +98,35 @@ GO
 		IF (@c > @i) BREAK;
 
 		-- Decrement the counters
-		UPDATE d SET Timer -= 1 FROM #data d;
+		UPDATE d SET Timer -= 1 FROM #part2_data d;
 
-		IF EXISTS (SELECT * FROM #data r WHERE r.Timer = -1)
+		IF EXISTS (SELECT * FROM #part2_data r WHERE r.Timer = -1)
 		BEGIN;
 			SELECT @AddCount = d.FishCount
-			FROM #data d
+			FROM #part2_data d
 			WHERE d.Timer = -1;
 
 			-- Add new fish
-			INSERT INTO #data (Timer, FishCount) VALUES (8, @AddCount);
+			INSERT INTO #part2_data (Timer, FishCount) VALUES (8, @AddCount);
 
 			-- Re-arrange - If fish with 6 day timer exists, then add to it, and remove the -1 timers
 			-- But if it doesn't exist (unlikely with larger set) then update our -1 record to a 6
-			IF EXISTS (SELECT * FROM #data WHERE Timer = 6)
+			IF EXISTS (SELECT * FROM #part2_data WHERE Timer = 6)
 			BEGIN;
-				UPDATE #data SET FishCount += @AddCount WHERE Timer = 6;
-				DELETE #data WHERE Timer = -1;
+				UPDATE #part2_data SET FishCount += @AddCount WHERE Timer = 6;
+				DELETE #part2_data WHERE Timer = -1;
 			END;
 			ELSE
 			BEGIN;
-				UPDATE #data SET Timer = 6 WHERE Timer = -1;
+				UPDATE #part2_data SET Timer = 6 WHERE Timer = -1;
 			END;
 		END;
 
 		RAISERROR('.',0,1) WITH NOWAIT;
 	END;
 
-	SELECT FORMAT(SUM(d.FishCount),'N0'), Answer = SUM(d.FishCount)
-	FROM #data d;
+	SELECT Answer = SUM(d.FishCount)
+	FROM #part2_data d;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
