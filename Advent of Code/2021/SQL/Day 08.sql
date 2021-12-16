@@ -4,7 +4,7 @@
 	IF OBJECT_ID('tempdb..#rawdata','U') IS NOT NULL DROP TABLE #rawdata; --SELECT * FROM #rawdata
 	CREATE TABLE #rawdata (ID int IDENTITY, Val varchar(200) NOT NULL);
 
-	DECLARE @UseSampleData bit = 0;
+	DECLARE @UseSampleData bit = 1;
 
 	IF (@UseSampleData = 1)
 	BEGIN;
@@ -39,7 +39,9 @@
 	END;
 
 	IF OBJECT_ID('tempdb..#output','U') IS NOT NULL DROP TABLE #output; --SELECT * FROM #output
-	SELECT r.ID, OuputValue = x.[value]
+	SELECT r.ID
+		, OutputValue = x.[value]
+		, OutputOrder = ROW_NUMBER() OVER (PARTITION BY r.ID ORDER BY 1/0) -- Relying on STRING_SPLIT ordering, not good, but good enough for this
 	INTO #output
 	FROM #rawdata r
 		CROSS APPLY STRING_SPLIT(SUBSTRING(r.Val, CHARINDEX(' | ', r.Val) + 3, 1000), ' ') x
@@ -50,7 +52,7 @@
 ------------------------------------------------------------------------------
 	SELECT Answer = COUNT(*)
 	FROM #output o
-	WHERE LEN(o.OuputValue) IN (2, 4, 3, 7) -- display digits = 1, 4, 7, 8
+	WHERE LEN(o.OutputValue) IN (2, 4, 3, 7) -- display digits = 1, 4, 7, 8
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
@@ -61,7 +63,7 @@
 		or if you only need to do it once to decode the whole dataset
 
 		I'm going to assume it needs to be decoded for every input record.
-		If that's the case than building a one-off mapping table won't work.
+		If that's the case then building a one-off mapping table won't work.
 
 		| Digit | Segments |
 		|-------|----------|
@@ -81,7 +83,8 @@
 		0, 6, 9 have 6 segments
 
 		Perhaps some sort of checksum could be used? Where AB = BA
-		Or maybe a bitmap. Where 0101010101 could represent which wires are on, and use bitwise operators to determine relationships?
+		Or maybe a bitmap. Where 0101010 could represent which wires are on, and use bitwise operators to determine relationships?
+			For example, 
 	*/
 ------------------------------------------------------------------------------
 
