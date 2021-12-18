@@ -1,10 +1,12 @@
+USE SandBox;
+GO
 ------------------------------------------------------------------------------
 -- Input data
 ------------------------------------------------------------------------------
 	IF OBJECT_ID('tempdb..#rawdata','U') IS NOT NULL DROP TABLE #rawdata; --SELECT * FROM #rawdata
 	CREATE TABLE #rawdata (ID int IDENTITY, Val varchar(200) NOT NULL);
 
-	DECLARE @UseSampleData bit = 1;
+	DECLARE @UseSampleData bit = 0;
 
 	IF (@UseSampleData = 1)
 	BEGIN;
@@ -19,12 +21,11 @@
 			('dbcfg fgd bdegcaf fgec aegbdf ecdfab fbedc dacgb gdcebf gf | cefg dcbef fcge gbcadfe'),
 			('bdfegc cbegaf gecbf dfcage bdacg ed bedf ced adcbefg gebcd | ed bcgafe cdgba cbgef'),
 			('egadfb cdbfeg cegd fecab cgb gbdefca cg fgcdab egfdb bfceg | gbdfcae bgc cg cgb'),
-			('gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce')
+			('gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce');
 	END;
 	ELSE
 	BEGIN;
 		RAISERROR('Real data',0,1) WITH NOWAIT;
-
 		INSERT INTO #rawdata (Val) VALUES
 			('ecbad fdeacg gaecbd gbae gfcdbea cadge fcagdb abc cfdbe ab | beag bac dacgbe aegb'),('gad agcfb afegcd afed gacdf gdfce ad cfdgbe cfgdeba bdcgea | gbdecf cdgeaf abcgde ad'),('ebadf ag efgcdab fgced edgbcf begcfa adgef gcaedf afg dgca | agcd agdc fagcbde gfa'),('bgaefd gfcbe fgeda dbf dafbgc dfbge bd bdgcaef dfecga ebad | dbf db edab dbf'),('ebfcgd fedbc adc da gafdce bdaec bdcegaf edbafc bdfa gbcea | afbcedg cedbf decfb eacbg'),('fdabec adefcg dcf gabcf fedgcba gdaebf dfcga gfead decg dc | beafgd fcd dfc dcf'),('cgfbd gfb cgfa dcgeb fg bdafge gcfbad acbfd fcdabe aefcgbd | abfdc cgfa gbf gf'),('dfae aeg cfeag ea fgedac fdcbega agebdc cdegf fgcedb abcfg | feda fcgba ae efcgda'),('eafdgb bfaceg fba bf bgdf agdecbf cdafe gabde dfbae agcdeb | bfeda ecdaf fb fab'),('agebf dgbcef dagc ebcgadf da dfcge egdaf dea dfecag fabecd | gefab feadg ead agdc'),('afbcg bdgcfe aecgf gb dcafgeb bgad agfcdb bfg bfdeca bafcd | gdba dabegfc decbagf acfdbe'),('ag acdgfb fecgbd edacbgf dgcfb gbad gaf ecbaf cagbf gefacd | ag cebaf gbdfce ga'),('ecbg gb acdbg dgceab acdegfb beadfc cfagd ecbda adfegb dbg | efdagb gebc gb bg'),('cdafgb gdebca edgbf becf fb fegcbd fgb egdfa cadefgb bgced | bf cbfaegd fecb fceb'),('bacgedf afdgb ebagf bfadec ebafcg ecabg fae fe ecfg cdabge | fe adcgebf gabef ef'),('cdgbaf ebadfc afcbdge gfeadc fgcde egdbf ce cagfd geac cef | dgfaec agec fgdaec ce'),('dcag dfeabc cba bfcdg ecdbfg egafb afgcb gcaefbd ca gfcabd | fcebdg dbegcf bcefadg gdfcb'),('cdgefa fdebg abfdg dba agcdf bcadfg cbadfe dabfegc acbg ab | fgadceb fbcgead bda facgd'),('fbg bf agbfde bgcdefa fcdb gcfebd efgcb ecgbd gefac gaedcb | cgbfe cfgbe fcaeg bgdfae'),('dafcg cefd fcg geafbd deagcf fcdgbea fbgcea abgdc cf gdaef | gcf fcg dfec fc'),
 			('cbea gebdfa ecbgf cfgdbe afgcbe gae adgbefc eagfc ea gfdac | agbfec eacfbg ea begafc'),('ba dfaegb afbd gfbea cegbf caegdb fdaeg dcfgeba feagcd abg | bafge dfba feagd gceafdb'),('dea bgade geabf adcfbe adgebf adgf bdegacf cdebg da agcfbe | dfag dafecgb dcaegbf cedbfa'),('fedcag fdebgca dfeab gdcaeb be fdeag fbge fadegb aeb bcadf | eba bae ebcfgda egfda'),('dcfb cgf abgcf gdcab adcgfe cf dgcbfa fabeg beacgd fgdebac | cgfdab deagfc feabg cf'),('adbgc cabgef adec dfgbec gdbfa cbgdafe dgc begac cbaged dc | cade bgafec gdc edca'),('agef eac fbceg ecgbfa bcdgea fceadbg cbfda eabcf ebfdgc ea | gfae badgfce acgdeb ea'),('cfb cdegfa badf gcaeb dbacgf cagdf eacgfdb fcagb dfgebc fb | bf gfdebc fcgdba cafgdb'),('dbgfae bgfeac bc cgb gecfd facb fbega fdgbace gbefc adecbg | edafgb cbg dgeafb fabc'),('geafcdb ec gcedfb acgbfd ecd cedfg gaefd bcfdg ecgb dcafeb | cde dfcbge acdfgb fegcd'),('decab acegf bfgdec cabegf bfc aebfc cbdefga adgcfe bf bagf | aecbfgd cfb bf cfdgbea'),('egf gfbade dbecg gdfeb edaf cadgbf fe cfaebg bgedcfa fadbg | fe gdfabc gfdbe fdbcag'),('fdgecb geb gdcfeba edagf dcefga dgbac bfdgea be eadgb ebaf | fdegba caegdf deabfg dgbea'),('egfbad efgacb bgfea cea gaefdcb cdeagf aecfb cgeb dbfac ec | ecbaf bafedcg ce dfaebcg'),('gecad dbeag dfcgea bd deb eabgf eabdfgc agbdec bcad fdcgeb | edb adgfce eagbf db'),('gdbac cbgea cdb gadfb cd faegdb dgfc dbceagf fbcadg ecadfb | facbdg cafdbe dc gcfd'),('cagbe abdgcf ca fcbgea baedg gac gdbfce ecfbg aefc gcfadeb | cafe face abcge febgc'),('gaebd fcba debca adc dacfge cfbde afdbce dgbefc ac fbceagd | ac becfd fcdbgae cefagd'),('cfdgbae abcgdf afbcg aecbg eb gedac bfgcea cbef fdbage bea | eabcg gcfba be geacdbf'),('cbfga faeg bcfae gbcda efbdac bfgcde bdefgac gf gfc agfbec | dgaebfc bdcfaeg gfea fage'),
@@ -38,21 +39,21 @@
 			('dcbgf dcgeb cf dfc fgdbeac eacdfg gcdabf gafbd adfgbe bafc | cgdafb bfac dgeafc fdabg'),('aefbcd cadgf eacdg bgade facgbd eac ec dacegbf gfec acfged | gecf bedagfc geadc eac'),('egcab eagdfc egcdfb aegdf dec afcd cgead eadcfgb agdfbe cd | eafcdg cgdae aedgc dbfacge'),('ag bfdcge gca bgcef fgcae bagdfc egab bcdeafg afdce abcgfe | fdagcb ag egab faegc'),('abdfgec bgdca edcg abedgf bcd cd cgeadb fgcab dbgea dacefb | cbd dgbca gabdce dcfbaeg'),('eacbg gbe egacd dbecfg agedcb bg dgab edfacg cafeb fbgcaed | dgba dgab aecfb gb'),('fcgabe fecab fabedcg edbca bdgfce afeg efbcg dabfcg fab af | bgedfc afb baf ebgcafd'),('badcgf bef cgedbf fbagc ceafbdg begfa afgecb eabc egfad eb | abefcg fbgae gebafc gdcfeb'),('dafecg defbc fbgcae dbcg abfed gecfd ebc cgefbd cb dfagcbe | cb ceb bdcg bgcd'),('acgefb cae dgecbfa fcead abfdc gdcfe dbae bdcgaf ea dbface | cefdg cea eca cefdabg'),('fab egfda fb egbcda bgfc gafdb afdbgc dfebac gbadcef cdabg | dbcfag fb bgfad ecafdb'),('bgace badceg fdeacbg bedc gdebfa bge eb cdaeg dgefac fcgba | be fcabgde gdcafeb be'),('cg dcg gdabcfe dcgfae gcdea abgdef fgec abedc bgcafd gadef | gfdea cbead ecfg dcg'),('aecbfg edagc edc edcgfa gcbad gfcae gefd adecbgf bdafec de | cgaefd efcga cagef bgcaef'),('fedgc dafecg bcedfag agdbc dgbfec bge dbceg bcgfea be bdfe | cdgefab gdabc gbe eadgfc'),('eagf fcgbad edgabf cfegbd efb dbeaf decba fbgad bfedcag fe | dfbaeg ef ebf fbe'),('cebfag dbefgc cdgba dcgaeb dfbagce dg bgeca aged adcbf gdc | cbdegaf gefcab abcgd daeg'),('gafdb bdfea afbgcd fgd dgcfaeb gdbc facbg gd acdfeg efbcag | gdcb adfeb gcafb bagcef'),('fdaec adbcf acegfbd efbdag afcedg ea gbefdc geac cfdge ead | aegc dgcef fdcae gcae'),('afcbed dce fgadc gcea abfcgde dgefb ec bfagcd fadgce fcegd | efbdca bfdecag cde cefgd');
 	END;
 
-	IF OBJECT_ID('tempdb..#output','U') IS NOT NULL DROP TABLE #output; --SELECT * FROM #output
+	IF OBJECT_ID('tempdb..#part1_data','U') IS NOT NULL DROP TABLE #part1_data; --SELECT * FROM #part1_data
 	SELECT r.ID
 		, OutputValue = x.[value]
 		, OutputOrder = ROW_NUMBER() OVER (PARTITION BY r.ID ORDER BY 1/0) -- Relying on STRING_SPLIT ordering, not good, but good enough for this
-	INTO #output
+	INTO #part1_data
 	FROM #rawdata r
-		CROSS APPLY STRING_SPLIT(SUBSTRING(r.Val, CHARINDEX(' | ', r.Val) + 3, 1000), ' ') x
+		CROSS APPLY STRING_SPLIT(SUBSTRING(r.Val, CHARINDEX(' | ', r.Val) + 3, 1000), ' ') x;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
 	SELECT Answer = COUNT(*)
-	FROM #output o
-	WHERE LEN(o.OutputValue) IN (2, 4, 3, 7) -- display digits = 1, 4, 7, 8
+	FROM #part1_data o
+	WHERE LEN(o.OutputValue) IN (2, 4, 3, 7); -- display digits = 1, 4, 7, 8
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
@@ -86,6 +87,106 @@
 		Or maybe a bitmap. Where 0101010 could represent which wires are on, and use bitwise operators to determine relationships?
 			For example, 
 	*/
+	------------------------------------------------------------------------------
+	GO
+	------------------------------------------------------------------------------
+	CREATE OR ALTER FUNCTION dbo.uf_SplitDigits (
+		@string varchar(200)
+	)
+	RETURNS TABLE
+	AS
+	RETURN (
+		SELECT i.DigitOrder, i.DigitSegments, y.Bitmap
+		FROM (
+			SELECT DigitOrder = ROW_NUMBER() OVER (ORDER BY 1/0)
+				, DigitSegments = x.[value]
+			FROM STRING_SPLIT(@string, ' ') x
+		) i
+			CROSS APPLY (
+				SELECT Bitmap = SUM(x.PowerValue)
+				FROM (
+					SELECT PowerValue = POWER(2, ASCII(SUBSTRING(i.DigitSegments, ROW_NUMBER() OVER (ORDER BY 1/0), 1)) - 97)
+					FROM STRING_SPLIT(REPLICATE(',', LEN(i.DigitSegments)-1), ',') z
+				) x
+			) y
+	);
+	------------------------------------------------------------------------------
+	GO
+	------------------------------------------------------------------------------
+	CREATE OR ALTER FUNCTION dbo.uf_DecodeSegments (
+		@string varchar(200)
+	)
+	RETURNS TABLE
+	AS
+	RETURN (
+		SELECT x.Bitmap
+			, Digit = CASE x.Bitmap
+						WHEN x.Segment_0 THEN 0
+						WHEN x.Segment_1 THEN 1
+						WHEN x.Segment_2 THEN 2
+						WHEN x.Segment_3 THEN 3
+						WHEN x.Segment_4 THEN 4
+						WHEN x.Segment_5 THEN 5
+						WHEN x.Segment_6 THEN 6
+						WHEN x.Segment_7 THEN 7
+						WHEN x.Segment_8 THEN 8
+						WHEN x.Segment_9 THEN 9
+						ELSE NULL
+					END
+		FROM (
+			SELECT x.*
+				, Segment_0 = FIRST_VALUE(y.Segment_0) OVER (ORDER BY y.Segment_0 DESC)
+				, Segment_2 = FIRST_VALUE(y.Segment_2) OVER (ORDER BY y.Segment_2 DESC)
+				, Segment_3 = FIRST_VALUE(y.Segment_3) OVER (ORDER BY y.Segment_3 DESC)
+			FROM (
+				SELECT x.*, Segment_6 = FIRST_VALUE(y.Segment_6) OVER (ORDER BY y.Segment_6 DESC)
+				FROM (
+					SELECT x.*, Segment_5 = FIRST_VALUE(y.Segment_5) OVER (ORDER BY y.Segment_5 DESC)
+					FROM (
+						SELECT x.*, Segment_9 = FIRST_VALUE(y.Segment_9) OVER (ORDER BY y.Segment_9 DESC)
+						FROM (
+							SELECT [value] = x.DigitSegments, x.Bitmap, m.Mapping
+								, Segment_1 = FIRST_VALUE(x.Bitmap) OVER (ORDER BY IIF(m.Mapping = 1, 1, 0) DESC)
+								, Segment_4 = FIRST_VALUE(x.Bitmap) OVER (ORDER BY IIF(m.Mapping = 4, 1, 0) DESC)
+								, Segment_7 = FIRST_VALUE(x.Bitmap) OVER (ORDER BY IIF(m.Mapping = 7, 1, 0) DESC)
+								, Segment_8 = FIRST_VALUE(x.Bitmap) OVER (ORDER BY IIF(m.Mapping = 8, 1, 0) DESC)
+							FROM dbo.uf_SplitDigits(@string)  x
+								-- Start with the obvious...1, 7, 4, 8 are unique so we can hard code those
+								CROSS APPLY (SELECT Mapping = CHOOSE(LEN(x.DigitSegments), NULL, 1, 7, 4, NULL, NULL, 8)) m
+						) x
+							-- Digit 9 is the only unmapped digit which shares all 4 segments of Digit 4
+							CROSS APPLY (SELECT Segment_9 = IIF(x.Mapping IS NULL AND x.Segment_4 & x.Bitmap = x.Segment_4, x.Bitmap, NULL)) y
+					) x
+						-- Digit 5 combined with Digit 1 looks like 9 which we previously decoded
+						CROSS APPLY (SELECT Segment_5 = IIF(x.Bitmap <> x.Segment_9 AND x.Bitmap | x.Segment_1 = x.Segment_9, x.Bitmap, NULL)) y
+				) x
+					-- This is a bit trickier. Here we take the xor of Digit 9 and Digit 5, which leaves us with only a single segment. Adding that segment to digit 6 makes it look like an 8
+					CROSS APPLY (SELECT Segment_6 = IIF(x.Bitmap <> x.Segment_8 AND (x.Segment_9 ^ x.Segment_5) | x.Bitmap = x.Segment_8, x.Bitmap, NULL)) y
+			) x
+				-- And finally...Digit 0 is the last 6 segment digit; 2 and 3 are different by 1 segment, so we "and it" with Digit 1 to see which is which
+				CROSS APPLY (
+					SELECT Segment_0 = IIF(LEN(x.[value]) = 6 AND x.Bitmap NOT IN (x.Segment_6, x.Segment_9), x.Bitmap, NULL)
+						,  Segment_2 = IIF(LEN(x.[Value]) = 5 AND x.Bitmap & x.Segment_1 <> x.Segment_1 AND x.Bitmap <> x.Segment_5, x.Bitmap, NULL)
+						,  Segment_3 = IIF(LEN(x.[value]) = 5 AND x.Bitmap & x.Segment_1 = x.Segment_1, x.Bitmap, NULL)
+				) y
+		) x
+	);
+	------------------------------------------------------------------------------
+	GO
+	------------------------------------------------------------------------------
+	IF OBJECT_ID('tempdb..#part2_data','U') IS NOT NULL DROP TABLE #part2_data; --SELECT * FROM #part2_data
+	SELECT cInput = LEFT(r.Val, CHARINDEX(' | ', r.Val))
+		, cOutput = SUBSTRING(r.Val, CHARINDEX(' | ', r.Val) + 3, 1000)
+	INTO #part2_data
+	FROM #rawdata r;
+
+	SELECT Answer = SUM(CONVERT(int, x.Val))
+	FROM #part2_data d
+		CROSS APPLY (
+			SELECT Val = STRING_AGG(i.Digit, '') WITHIN GROUP (ORDER BY o.DigitOrder)
+			FROM dbo.uf_SplitDigits(d.cOutput) o
+				CROSS APPLY (SELECT i.Digit FROM dbo.uf_DecodeSegments(d.cInput) i WHERE i.Bitmap = o.Bitmap) i
+		) x;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
