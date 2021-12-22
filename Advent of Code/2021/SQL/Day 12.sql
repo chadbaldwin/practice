@@ -99,7 +99,7 @@
         However, we now have a problem...a small cave has appeared twice (`start-b-d-b`)...how do we check for this at each round to identify illegal paths?
 
         It seems like this can be a simple check, just search the path for the current PathEnd, if it matches, then we skip that path,
-        but we only perform the check for large caves.
+        but we only perform the check for small caves.
         
         So maybe something like `IsLegal = IIF(x.Path LIKE '-' + x.PathEnd + '-' AND x.PathEnd = LOWER(x.PathEnd), 0, 1)`
 

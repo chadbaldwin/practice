@@ -8,7 +8,7 @@ GO
 
     DECLARE @UseSampleData bit = 1;
 
-    IF (@UseSampleData = 0)
+    IF (@UseSampleData = 1)
     BEGIN;
         RAISERROR('Sample data',0,1) WITH NOWAIT;
         INSERT INTO #rawdata (Val) VALUES
