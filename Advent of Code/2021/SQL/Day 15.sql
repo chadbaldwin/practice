@@ -33,109 +33,147 @@ GO
 
 	IF OBJECT_ID('tempdb..#data','U') IS NOT NULL DROP TABLE #data; --SELECT * FROM #data
 	CREATE TABLE #data (
-		ID			int			NOT NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED,
+		ID			int			NOT NULL PRIMARY KEY CLUSTERED,
 		RowID		smallint	NOT NULL,
 		ColID		smallint	NOT NULL,
 		Val			smallint	NOT NULL,
+		-- Neighbors
+		nRight		int				NULL,
+		nLeft		int				NULL,
+		nUp			int				NULL,
+		nDown		int				NULL,
+		-- Cost
 		CostToEnd	int				NULL,
 	);
 
-	CREATE UNIQUE NONCLUSTERED INDEX IX_#data_RowID_ColID_Val ON #data (RowID, ColID) INCLUDE (Val);
-	CREATE UNIQUE NONCLUSTERED INDEX IX_#data_ColID_RowID_Val ON #data (ColID, RowID) INCLUDE (Val);
-
-	INSERT INTO #data (RowID, ColID, Val)
-	SELECT RowID = r.ID-1, x.ColID, x.Val
-	FROM #rawdata r
-		CROSS APPLY (
-			SELECT ColID = ROW_NUMBER() OVER (ORDER BY 1/0)-1
-				, Val = CONVERT(smallint, SUBSTRING(r.Val,  ROW_NUMBER() OVER (ORDER BY 1/0), 1))
-			FROM STRING_SPLIT(REPLICATE(',',LEN(r.Val)-1),',') x
-		) x;
+	WITH cte_points AS (
+		SELECT ID = CONVERT(int, CONCAT(r.ID-1, RIGHT(CONCAT('0000',x.ColID), 4)))
+			, RowID = r.ID-1, x.ColID, x.Val
+		FROM #rawdata r
+			CROSS APPLY (
+				SELECT ColID = ROW_NUMBER() OVER (ORDER BY 1/0)-1
+					, Val = CONVERT(smallint, SUBSTRING(r.Val,  ROW_NUMBER() OVER (ORDER BY 1/0), 1))
+				FROM STRING_SPLIT(REPLICATE(',',LEN(r.Val)-1),',') x
+			) x
+	)
+	INSERT INTO #data (ID, RowID, ColID, Val, nRight, nLeft, nUp, nDown)
+	SELECT d.ID, d.RowID, d.ColID, d.Val
+		, nLeft		= LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+		, nRight	= LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+		, nUp		= LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+		, nDown		= LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+	FROM cte_points d;
 -----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
-	IF OBJECT_ID('tempdb..#tmp','U') IS NOT NULL DROP TABLE #tmp; --SELECT * FROM #tmp
-	CREATE TABLE #tmp (
-		ID			int				NOT NULL,
-		Val			smallint		NOT NULL,
-		CostToEnd	int				NOT NULL,
-		LevelID		smallint		NOT NULL,
-		PrevID		int					NULL,
-		PathString	varchar(4000)	NOT NULL,
-	);
-	CREATE CLUSTERED INDEX IX_#tmp_ID_LevelID ON #tmp (ID);
-	------------------------------------------------------------------------------
-	
-	------------------------------------------------------------------------------
-	-- Seed the table
-	INSERT INTO #tmp (ID, Val, CostToEnd, LevelID, PrevID, PathString)
-	SELECT TOP(1) d.ID, d.Val, 0, 0, 0, CONCAT('',d.Val)
-	FROM #data d
-	ORDER BY d.RowID DESC, d.ColID DESC;
-
-	UPDATE d SET d.CostToEnd = t.CostToEnd
-	FROM #data d
-		JOIN #tmp t ON t.ID = d.ID;
-	------------------------------------------------------------------------------
-	
-	------------------------------------------------------------------------------
-	WHILE NOT EXISTS(SELECT * FROM #tmp WHERE ID = 1)
-	BEGIN;
-		INSERT INTO #tmp (ID, Val, CostToEnd, LevelID, PrevID, PathString)
-		SELECT DISTINCT n.ID, n.Val
-			, CostToEnd = t.CostToEnd + t.Val
-			, LevelID = t.LevelID + 1
-			, PrevID = t.ID
-			, CONCAT(t.PathString, '->', n.Val)
-		--	, N'|||||||||||||', d.RowID, d.ColID, d.Val, N'|||||||||||||', n.RowID, n.ColID, n.Val
-		FROM #tmp t
-			JOIN #data d ON t.ID = d.ID
-			CROSS APPLY (
-				SELECT d2.ID, d2.RowID, d2.ColID, d2.Val FROM #data d2 WHERE d2.ColID = d.ColID AND d2.RowID = d.RowID - 1 -- Up
-				UNION ALL
-				SELECT d2.ID, d2.RowID, d2.ColID, d2.Val FROM #data d2 WHERE d2.ColID = d.ColID AND d2.RowID = d.RowID + 1 -- Down
-				UNION ALL
-				SELECT d2.ID, d2.RowID, d2.ColID, d2.Val FROM #data d2 WHERE d2.RowID = d.RowID AND d2.ColID = d.ColID - 1 -- Left
-				UNION ALL
-				SELECT d2.ID, d2.RowID, d2.ColID, d2.Val FROM #data d2 WHERE d2.RowID = d.RowID AND d2.ColID = d.ColID + 1 -- Right
-			) n
-		WHERE NOT EXISTS (SELECT * FROM #tmp t2 WHERE t2.ID = n.ID)
-			AND n.ID <> t.PrevID;
-		--ORDER BY d.RowID, d.ColID, n.RowID, n.ColID
-
-		DELETE x FROM (SELECT rn = ROW_NUMBER() OVER (PARTITION BY ID ORDER BY CostToEnd) FROM #tmp) x WHERE x.rn > 1;
-		DELETE #tmp WHERE LevelID < (SELECT MAX(LevelID) FROM #tmp);
-
-		UPDATE d SET d.CostToEnd = t.CostToEnd
+	/*
+		In my testing, takes about 7 seconds to solve.
+	*/
+	WITH cte_seed AS (
+		SELECT TOP(1) d.CostToEnd
 		FROM #data d
-			JOIN #tmp t ON t.ID = d.ID
-		WHERE d.CostToEnd IS NULL OR t.CostToEnd < d.CostToEnd;
+		ORDER BY d.ID DESC
+	)
+	UPDATE cte_seed SET CostToEnd = 0
+	------------------------------------------------------------------------------
 
-		RAISERROR('.',0,1) WITH NOWAIT;
+	------------------------------------------------------------------------------
+	WHILE (1=1)
+	BEGIN;
+		UPDATE d2 SET d2.CostToEnd = c.NewCost
+		FROM #data d1
+			CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
+			CROSS APPLY (VALUES (d1.nLeft),(d1.nRight),(d1.nUp),(d1.nDown)) n(ID)
+			JOIN #data d2 ON d2.ID = n.ID
+		WHERE d1.CostToEnd IS NOT NULL
+			AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
+
+		IF (@@ROWCOUNT = 0) BREAK;
 	END;
 
-	SELECT Answer = MIN(t.CostToEnd)
-	FROM #tmp t
-	WHERE t.ID = 1;
-
-	SELECT t.ID, t.LevelID, d.RowID, d.ColID, d.Val, t.CostToEnd, t.PathString
-	FROM #tmp t
-		JOIN #data d ON d.ID = t.ID
-	--WHERE t.ID = 1
-	ORDER BY t.ID;
+	SELECT Answer = d.CostToEnd
+	FROM #data d
+	WHERE d.ID = 0
+	RAISERROR('.',0,1) WITH NOWAIT;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
+	/*
+		Warning, because this is exponentially larger than Part 1, it takes about 10 min to run.
 
+		If I find a way to optimize it, I might try to work it in.
 
+		The mechanism that solves it is exactly the same as Part 1, no changes made, the only change made
+		was to the source data by adding the new rows and columns.
+	*/
+	DECLARE @Rows int, @Cols int;
 
+	SELECT @Rows = MAX(d.RowID)+1, @Cols = MAX(d.ColID)+1
+	FROM #data d
 
+	INSERT INTO #data (ID, RowID, ColID, Val)
+	SELECT z.ID, i.RowID, i.ColID, IIF(n.NewVal > 9, n.NewVal - 9, n.NewVal)
+	FROM #data d
+		CROSS APPLY (VALUES (0),(1),(2),(3),(4)) y(RowMultiplier)
+		CROSS APPLY (VALUES (0),(1),(2),(3),(4)) x(ColMultiplier)
+		CROSS APPLY (
+			SELECT RowID = d.RowID + @Rows * y.RowMultiplier
+				,  ColID = d.ColID + @Cols * x.ColMultiplier
+		) i
+		CROSS APPLY (SELECT ID = CONVERT(int, CONCAT(i.RowID, RIGHT(CONCAT('0000',i.ColID), 4)))) z
+		CROSS APPLY (SELECT NewVal = d.Val + y.RowMultiplier + x.ColMultiplier) n
+	WHERE NOT EXISTS (SELECT * FROM #data d2 WHERE d2.ID = z.ID);
 
+	WITH cte_data AS (
+		SELECT d.nRight, d.nLeft, d.nUp, d.nDown, d.CostToEnd
+			, new_nLeft		= LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+			, new_nRight	= LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+			, new_nUp		= LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+			, new_nDown		= LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+		FROM #data d
+	)
+	UPDATE d SET d.nRight		= d.new_nRight
+				, d.nLeft		= d.new_nLeft
+				, d.nUp			= d.new_nUp
+				, d.nDown		= d.new_nDown
+				, d.CostToEnd	= NULL
+	FROM cte_data d;
+	------------------------------------------------------------------------------
+	
+	------------------------------------------------------------------------------
+	WITH cte_seed AS (
+		SELECT TOP(1) d.CostToEnd
+		FROM #data d
+		ORDER BY d.ID DESC
+	)
+	UPDATE cte_seed SET CostToEnd = 0
+	------------------------------------------------------------------------------
 
+	------------------------------------------------------------------------------
+	DECLARE @rc int;
+	WHILE (1=1)
+	BEGIN;
+		UPDATE d2 SET d2.CostToEnd = c.NewCost
+		FROM #data d1
+			CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
+			CROSS APPLY (VALUES (d1.nLeft),(d1.nRight),(d1.nUp),(d1.nDown)) n(ID)
+			JOIN #data d2 ON d2.ID = n.ID
+		WHERE d1.CostToEnd IS NOT NULL
+			AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
+
+		SET @rc = @@ROWCOUNT;
+		RAISERROR('%i',0,1,@rc) WITH NOWAIT;
+		IF (@rc = 0) BREAK;
+	END;
+
+	SELECT Answer = d.CostToEnd
+	FROM #data d
+	WHERE d.ID = 0
+	RAISERROR('.',0,1) WITH NOWAIT;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
