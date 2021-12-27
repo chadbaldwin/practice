@@ -1,15 +1,4 @@
-﻿SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-SET NOCOUNT ON;
-
-/*
-SET NOCOUNT OFF;
-
-SET STATISTICS TIME ON;
-SET STATISTICS IO ON;
-
-SET STATISTICS TIME OFF;
-SET STATISTICS IO OFF;
-*/
+﻿SET NOCOUNT ON;
 GO
 ------------------------------------------------------------------------------
 -- Input data
@@ -48,89 +37,112 @@ GO
 		RowID		smallint	NOT NULL,
 		Val			smallint	NOT NULL,
 		-- Neighbors
-		n0			int				NULL,
-		n1			int				NULL,
-		n2			int				NULL,
-		n3			int				NULL,
+		nL			int				NULL,
+		nR			int				NULL,
+		nU			int				NULL,
+		nD			int				NULL,
 		-- Cost
 		CostToEnd	int				NULL,
 	);
 
-	WITH cte_points AS (
-		SELECT ID = CONVERT(int, CONCAT(r.ID-1, RIGHT(CONCAT('0000',x.ColID), 4)))
-			, x.ColID, RowID = r.ID-1, x.Val
-		FROM #rawdata r
-			CROSS APPLY (
-				SELECT ColID = ROW_NUMBER() OVER (ORDER BY 1/0)-1
-					, Val = CONVERT(smallint, SUBSTRING(r.Val,  ROW_NUMBER() OVER (ORDER BY 1/0), 1))
-				FROM STRING_SPLIT(REPLICATE(',',LEN(r.Val)-1),',') x
-			) x
+	INSERT INTO #data (ID, ColID, RowID, Val)
+	SELECT ID = CONVERT(int, CONCAT(r.ID-1, RIGHT(CONCAT('0000',x.ColID), 4)))
+		, x.ColID, RowID = r.ID-1, x.Val
+	FROM #rawdata r
+		CROSS APPLY (
+			SELECT ColID = ROW_NUMBER() OVER (ORDER BY 1/0)-1
+				, Val = CONVERT(smallint, SUBSTRING(r.Val,  ROW_NUMBER() OVER (ORDER BY 1/0), 1))
+			FROM STRING_SPLIT(REPLICATE(',',LEN(r.Val)-1),',') x
+		) x
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+-- Reduce duplication, put solving logic into stored proc
+------------------------------------------------------------------------------
+GO
+CREATE OR ALTER PROCEDURE #usp_FindCheapestPath
+AS
+BEGIN;
+	------------------------------------------------------------------------------
+	-- Prep data
+	------------------------------------------------------------------------------
+	WITH cte_data AS (
+		SELECT d.nL, d.nR, d.nU, d.nD, d.CostToEnd
+			, _nL = LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+			, _nR = LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+			, _nU = LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+			, _nD = LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+		FROM #data d
 	)
-	INSERT INTO #data (ID, ColID, RowID, Val, n0, n1, n2, n3)
-	SELECT d.ID, d.ColID, d.RowID, d.Val
-		, n1 = LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-		, n0 = LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-		, n2 = LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
-		, n3 = LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
-	FROM cte_points d;
+	UPDATE d SET d.nL = d._nL, d.nR = d._nR, d.nU = d._nU, d.nD = d._nD
+	FROM cte_data d;
+
+	UPDATE #data SET CostToEnd = NULL;
+
+	WITH cte_seed AS (SELECT TOP(1) * FROM #data ORDER BY ID DESC)
+	UPDATE cte_seed SET CostToEnd = 0;
+
+	WITH cte_seed AS (SELECT TOP(1) * FROM #data ORDER BY ID)
+	UPDATE cte_seed SET CostToEnd = 0, Val = 0;
+	------------------------------------------------------------------------------
+	
+	------------------------------------------------------------------------------
+	-- Find all path costs
+	------------------------------------------------------------------------------
+	DECLARE @MaxXY int;
+	SELECT @MaxXY = MAX(RowID) FROM #data;
+
+	DECLARE @rc int, @i int = 0;
+	WHILE (1=1)
+	BEGIN;
+		UPDATE d2 SET d2.CostToEnd = c.NewCost -- SELECT *
+		FROM #data d1
+			CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
+			CROSS APPLY (VALUES (d1.nL),(d1.nR),(d1.nU),(d1.nD)) n(ID)
+			JOIN #data d2 WITH(TABLOCKX) ON d2.ID = n.ID
+		WHERE d1.CostToEnd IS NOT NULL
+			AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
+			AND d2.RowID + d2.ColID <> @MaxXY;
+		SET @rc = @@ROWCOUNT;
+
+		IF (@i % 10 = 0) RAISERROR('%4i - %6i',0,1,@i,@rc) WITH NOWAIT;
+		IF (@rc = 0) BREAK;
+		SET @i += 1;
+	END;
+	------------------------------------------------------------------------------
+	
+	------------------------------------------------------------------------------
+	-- Return answer
+	------------------------------------------------------------------------------
+	SELECT TOP(1) Answer = d0.Val + d1.Val + d2.Val + d1.CostToEnd + d2.CostToEnd
+	FROM #data d0
+		JOIN #data d1 ON d1.ID = d0.nL OR d1.ID = d0.nU
+		JOIN #data d2 ON d2.ID = d0.nR OR d2.ID = d0.nD
+	WHERE d0.RowID + d0.ColID = @MaxXY
+	ORDER BY Answer;
+END;
+GO
 -----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
-		/*
-			In my testing, takes about 7 seconds to solve.
-		*/
-		UPDATE #data SET CostToEnd = NULL;
-
-		WITH cte_seed AS (
-			SELECT TOP(1) d.CostToEnd
-			FROM #data d
-			ORDER BY d.ID DESC
-		)
-		UPDATE cte_seed SET CostToEnd = 0
-		------------------------------------------------------------------------------
-
-		------------------------------------------------------------------------------
-		DECLARE @rc int, @i int = 0;
-		WHILE (1=1)
-		BEGIN;
-			UPDATE d2 SET d2.CostToEnd = c.NewCost -- SELECT *
-			FROM #data d1
-				CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
-				CROSS APPLY (VALUES (d1.n0),(d1.n1),(d1.n2),(d1.n3)) n(ID)
-				JOIN #data d2 WITH(TABLOCKX) ON d2.ID = n.ID
-			WHERE d1.CostToEnd IS NOT NULL
-				AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
-				AND n.ID IS NOT NULL
-			SET @rc = @@ROWCOUNT;
-
-			IF (@i % 10 = 0) RAISERROR('% 4i - % 5i',0,1,@i,@rc) WITH NOWAIT;
-			IF (@rc = 0) BREAK;
-			SET @i += 1;
-		END;
-
-		SELECT Answer = d.CostToEnd
-		FROM #data d
-		WHERE d.ID = 0
-		RAISERROR('.',0,1) WITH NOWAIT;
+	RAISERROR('Part 1',0,1) WITH NOWAIT;
+	EXEC #usp_FindCheapestPath;
 ------------------------------------------------------------------------------
 GO
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
+	RAISERROR('Part 2',0,1) WITH NOWAIT;
 	/*
-		Warning, because this is exponentially larger than Part 1, it takes about 17 min to run.
-
-		If I find a way to optimize it, I might try to work it in.
+		Warning, because this is exponentially larger than Part 1, it takes about 10 min to run.
 
 		The mechanism that solves it is exactly the same as Part 1, no changes made, the only change made
 		was to the source data by adding the new rows and columns.
 	*/
 	DECLARE @Rows int, @Cols int;
-
-	SELECT @Rows = MAX(d.RowID)+1, @Cols = MAX(d.ColID)+1
-	FROM #data d
+	SELECT @Rows = MAX(d.RowID)+1, @Cols = MAX(d.ColID)+1 FROM #data d;
 
 	INSERT INTO #data (ID, RowID, ColID, Val)
 	SELECT z.ID, n.RowID, n.ColID, IIF(n.NewVal > 9, n.NewVal - 9, n.NewVal)
@@ -145,54 +157,7 @@ GO
 		CROSS APPLY (SELECT ID = CONVERT(int, CONCAT(n.RowID, RIGHT(CONCAT('0000',n.ColID), 4)))) z
 	WHERE NOT EXISTS (SELECT * FROM #data d2 WHERE d2.ID = z.ID);
 
-	WITH cte_data AS (
-		SELECT d.n0, d.n1, d.n2, d.n3, d.CostToEnd
-			, _n1 = LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-			, _n0 = LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-			, _n2 = LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
-			, _n3 = LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
-		FROM #data d
-	)
-	UPDATE d SET  d.n0	= d._n0
-				, d.n1	= d._n1
-				, d.n2	= d._n2
-				, d.n3	= d._n3
-				, d.CostToEnd = NULL
-	FROM cte_data d;
-	------------------------------------------------------------------------------
-	
-	------------------------------------------------------------------------------
-	WITH cte_seed AS (
-		SELECT TOP(1) d.CostToEnd
-		FROM #data d
-		ORDER BY d.ID DESC
-	)
-	UPDATE cte_seed SET CostToEnd = 0
-	------------------------------------------------------------------------------
-
-	------------------------------------------------------------------------------
-	DECLARE @rc int, @i int = 0;
-	WHILE (1=1)
-	BEGIN;
-		UPDATE d2 SET d2.CostToEnd = c.NewCost --SELECT *
-		FROM #data d1
-			CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
-			CROSS APPLY (VALUES (d1.n0),(d1.n1),(d1.n2),(d1.n3)) n(ID)
-			JOIN #data d2 WITH(TABLOCKX) ON d2.ID = n.ID
-		WHERE d1.CostToEnd IS NOT NULL
-			AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
-			AND n.ID IS NOT NULL;
-		SET @rc = @@ROWCOUNT;
-
-		IF (@i % 10 = 0) RAISERROR('% 4i - % 6i',0,1,@i,@rc) WITH NOWAIT;
-		IF (@rc = 0) BREAK;
-		SET @i += 1;
-	END;
-
-	SELECT Answer = d.CostToEnd
-	FROM #data d
-	WHERE d.ID = 0
-	RAISERROR('.',0,1) WITH NOWAIT;
+	EXEC #usp_FindCheapestPath;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
