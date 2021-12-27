@@ -1,5 +1,15 @@
+﻿SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 SET NOCOUNT ON;
---SET NOCOUNT OFF;
+
+/*
+SET NOCOUNT OFF;
+
+SET STATISTICS TIME ON;
+SET STATISTICS IO ON;
+
+SET STATISTICS TIME OFF;
+SET STATISTICS IO OFF;
+*/
 GO
 ------------------------------------------------------------------------------
 -- Input data
@@ -34,21 +44,21 @@ GO
 	IF OBJECT_ID('tempdb..#data','U') IS NOT NULL DROP TABLE #data; --SELECT * FROM #data
 	CREATE TABLE #data (
 		ID			int			NOT NULL PRIMARY KEY CLUSTERED,
-		RowID		smallint	NOT NULL,
 		ColID		smallint	NOT NULL,
+		RowID		smallint	NOT NULL,
 		Val			smallint	NOT NULL,
 		-- Neighbors
-		nRight		int				NULL,
-		nLeft		int				NULL,
-		nUp			int				NULL,
-		nDown		int				NULL,
+		n0			int				NULL,
+		n1			int				NULL,
+		n2			int				NULL,
+		n3			int				NULL,
 		-- Cost
 		CostToEnd	int				NULL,
 	);
 
 	WITH cte_points AS (
 		SELECT ID = CONVERT(int, CONCAT(r.ID-1, RIGHT(CONCAT('0000',x.ColID), 4)))
-			, RowID = r.ID-1, x.ColID, x.Val
+			, x.ColID, RowID = r.ID-1, x.Val
 		FROM #rawdata r
 			CROSS APPLY (
 				SELECT ColID = ROW_NUMBER() OVER (ORDER BY 1/0)-1
@@ -56,54 +66,61 @@ GO
 				FROM STRING_SPLIT(REPLICATE(',',LEN(r.Val)-1),',') x
 			) x
 	)
-	INSERT INTO #data (ID, RowID, ColID, Val, nRight, nLeft, nUp, nDown)
-	SELECT d.ID, d.RowID, d.ColID, d.Val
-		, nLeft		= LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-		, nRight	= LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-		, nUp		= LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
-		, nDown		= LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+	INSERT INTO #data (ID, ColID, RowID, Val, n0, n1, n2, n3)
+	SELECT d.ID, d.ColID, d.RowID, d.Val
+		, n1 = LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+		, n0 = LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+		, n2 = LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+		, n3 = LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
 	FROM cte_points d;
 -----------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
-	/*
-		In my testing, takes about 7 seconds to solve.
-	*/
-	WITH cte_seed AS (
-		SELECT TOP(1) d.CostToEnd
+		/*
+			In my testing, takes about 7 seconds to solve.
+		*/
+		UPDATE #data SET CostToEnd = NULL;
+
+		WITH cte_seed AS (
+			SELECT TOP(1) d.CostToEnd
+			FROM #data d
+			ORDER BY d.ID DESC
+		)
+		UPDATE cte_seed SET CostToEnd = 0
+		------------------------------------------------------------------------------
+
+		------------------------------------------------------------------------------
+		DECLARE @rc int, @i int = 0;
+		WHILE (1=1)
+		BEGIN;
+			UPDATE d2 SET d2.CostToEnd = c.NewCost -- SELECT *
+			FROM #data d1
+				CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
+				CROSS APPLY (VALUES (d1.n0),(d1.n1),(d1.n2),(d1.n3)) n(ID)
+				JOIN #data d2 WITH(TABLOCKX) ON d2.ID = n.ID
+			WHERE d1.CostToEnd IS NOT NULL
+				AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
+				AND n.ID IS NOT NULL
+			SET @rc = @@ROWCOUNT;
+
+			IF (@i % 10 = 0) RAISERROR('% 4i - % 5i',0,1,@i,@rc) WITH NOWAIT;
+			IF (@rc = 0) BREAK;
+			SET @i += 1;
+		END;
+
+		SELECT Answer = d.CostToEnd
 		FROM #data d
-		ORDER BY d.ID DESC
-	)
-	UPDATE cte_seed SET CostToEnd = 0
-	------------------------------------------------------------------------------
-
-	------------------------------------------------------------------------------
-	WHILE (1=1)
-	BEGIN;
-		UPDATE d2 SET d2.CostToEnd = c.NewCost
-		FROM #data d1
-			CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
-			CROSS APPLY (VALUES (d1.nLeft),(d1.nRight),(d1.nUp),(d1.nDown)) n(ID)
-			JOIN #data d2 ON d2.ID = n.ID
-		WHERE d1.CostToEnd IS NOT NULL
-			AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
-
-		IF (@@ROWCOUNT = 0) BREAK;
-	END;
-
-	SELECT Answer = d.CostToEnd
-	FROM #data d
-	WHERE d.ID = 0
-	RAISERROR('.',0,1) WITH NOWAIT;
+		WHERE d.ID = 0
+		RAISERROR('.',0,1) WITH NOWAIT;
 ------------------------------------------------------------------------------
-
+GO
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
 	/*
-		Warning, because this is exponentially larger than Part 1, it takes about 10 min to run.
+		Warning, because this is exponentially larger than Part 1, it takes about 17 min to run.
 
 		If I find a way to optimize it, I might try to work it in.
 
@@ -116,31 +133,31 @@ GO
 	FROM #data d
 
 	INSERT INTO #data (ID, RowID, ColID, Val)
-	SELECT z.ID, i.RowID, i.ColID, IIF(n.NewVal > 9, n.NewVal - 9, n.NewVal)
+	SELECT z.ID, n.RowID, n.ColID, IIF(n.NewVal > 9, n.NewVal - 9, n.NewVal)
 	FROM #data d
-		CROSS APPLY (VALUES (0),(1),(2),(3),(4)) y(RowMultiplier)
 		CROSS APPLY (VALUES (0),(1),(2),(3),(4)) x(ColMultiplier)
+		CROSS APPLY (VALUES (0),(1),(2),(3),(4)) y(RowMultiplier)
 		CROSS APPLY (
-			SELECT RowID = d.RowID + @Rows * y.RowMultiplier
+			SELECT NewVal = d.Val + y.RowMultiplier + x.ColMultiplier
+				,  RowID = d.RowID + @Rows * y.RowMultiplier
 				,  ColID = d.ColID + @Cols * x.ColMultiplier
-		) i
-		CROSS APPLY (SELECT ID = CONVERT(int, CONCAT(i.RowID, RIGHT(CONCAT('0000',i.ColID), 4)))) z
-		CROSS APPLY (SELECT NewVal = d.Val + y.RowMultiplier + x.ColMultiplier) n
+		) n
+		CROSS APPLY (SELECT ID = CONVERT(int, CONCAT(n.RowID, RIGHT(CONCAT('0000',n.ColID), 4)))) z
 	WHERE NOT EXISTS (SELECT * FROM #data d2 WHERE d2.ID = z.ID);
 
 	WITH cte_data AS (
-		SELECT d.nRight, d.nLeft, d.nUp, d.nDown, d.CostToEnd
-			, new_nLeft		= LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-			, new_nRight	= LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
-			, new_nUp		= LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
-			, new_nDown		= LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+		SELECT d.n0, d.n1, d.n2, d.n3, d.CostToEnd
+			, _n1 = LAG(d.ID)  OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+			, _n0 = LEAD(d.ID) OVER (PARTITION BY d.RowID ORDER BY d.ColID)
+			, _n2 = LAG(d.ID)  OVER (PARTITION BY d.ColID ORDER BY d.RowID)
+			, _n3 = LEAD(d.ID) OVER (PARTITION BY d.ColID ORDER BY d.RowID)
 		FROM #data d
 	)
-	UPDATE d SET d.nRight		= d.new_nRight
-				, d.nLeft		= d.new_nLeft
-				, d.nUp			= d.new_nUp
-				, d.nDown		= d.new_nDown
-				, d.CostToEnd	= NULL
+	UPDATE d SET  d.n0	= d._n0
+				, d.n1	= d._n1
+				, d.n2	= d._n2
+				, d.n3	= d._n3
+				, d.CostToEnd = NULL
 	FROM cte_data d;
 	------------------------------------------------------------------------------
 	
@@ -154,20 +171,22 @@ GO
 	------------------------------------------------------------------------------
 
 	------------------------------------------------------------------------------
-	DECLARE @rc int;
+	DECLARE @rc int, @i int = 0;
 	WHILE (1=1)
 	BEGIN;
-		UPDATE d2 SET d2.CostToEnd = c.NewCost
+		UPDATE d2 SET d2.CostToEnd = c.NewCost --SELECT *
 		FROM #data d1
 			CROSS APPLY (SELECT NewCost = d1.CostToEnd + d1.Val) c
-			CROSS APPLY (VALUES (d1.nLeft),(d1.nRight),(d1.nUp),(d1.nDown)) n(ID)
-			JOIN #data d2 ON d2.ID = n.ID
+			CROSS APPLY (VALUES (d1.n0),(d1.n1),(d1.n2),(d1.n3)) n(ID)
+			JOIN #data d2 WITH(TABLOCKX) ON d2.ID = n.ID
 		WHERE d1.CostToEnd IS NOT NULL
 			AND (c.NewCost < d2.CostToEnd OR d2.CostToEnd IS NULL)
-
+			AND n.ID IS NOT NULL;
 		SET @rc = @@ROWCOUNT;
-		RAISERROR('%i',0,1,@rc) WITH NOWAIT;
+
+		IF (@i % 10 = 0) RAISERROR('% 4i - % 6i',0,1,@i,@rc) WITH NOWAIT;
 		IF (@rc = 0) BREAK;
+		SET @i += 1;
 	END;
 
 	SELECT Answer = d.CostToEnd
