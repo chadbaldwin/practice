@@ -56,16 +56,16 @@
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
-SELECT Answer = SUM(x.Val)
-FROM (
-    SELECT x.ID, x.Val
-        , rn = ROW_NUMBER() OVER (PARTITION BY x.GroupID, x.Val ORDER BY x.ID)
+    SELECT Answer = SUM(x.Val)
     FROM (
-        SELECT DISTINCT d.ID, d.GroupID, d.Val
-        FROM #data d
+        SELECT x.ID, x.Val
+            , rn = ROW_NUMBER() OVER (PARTITION BY x.GroupID, x.Val ORDER BY x.ID)
+        FROM (
+            SELECT DISTINCT d.ID, d.GroupID, d.Val
+            FROM #data d
+        ) x
     ) x
-) x
-WHERE rn = 3
+    WHERE rn = 3
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
