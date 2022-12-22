@@ -65,7 +65,7 @@
             CROSS APPLY STRING_SPLIT(x.Val,',',1) y
         WHERE CHARINDEX('[', d.Val) > 0
     ) x
-    GROUP BY x.Stack
+    GROUP BY x.Stack;
 
     DROP TABLE IF EXISTS #instructions; --SELECT * FROM #instructions
     SELECT ID = ROW_NUMBER() OVER (ORDER BY d.ID) --Reset numbering to 1
@@ -75,7 +75,7 @@
     INTO #instructions
     FROM #rawdata d
         CROSS APPLY (SELECT Val = REPLACE(REPLACE(REPLACE(d.Val,'move ',''),' from ','.'),' to ','.')) x
-    WHERE d.Val LIKE 'move %'
+    WHERE d.Val LIKE 'move %';
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
@@ -113,9 +113,9 @@
     DECLARE instruction CURSOR FAST_FORWARD READ_ONLY
         FOR SELECT MoveCount, FromStack, ToStack
             FROM #instructions
-            ORDER BY ID
+            ORDER BY ID;
     
-    OPEN instruction
+    OPEN instruction;
     
     FETCH NEXT FROM instruction INTO @Count, @From, @To;
     
@@ -126,30 +126,30 @@
                     , @Items1 = RIGHT(s.Items1, @Count)
                     , @Items2 = RIGHT(s.Items2, @Count)
         FROM #stacks s
-        WHERE s.Stack = @From
+        WHERE s.Stack = @From;
 
         UPDATE s SET  s.Items1 += REVERSE(@Items1)
                     , s.Items2 += @Items2
         FROM #stacks s
-        WHERE s.Stack = @To
+        WHERE s.Stack = @To;
 
         FETCH NEXT FROM instruction INTO @Count, @From, @To;
-    END
+    END;
     
-    CLOSE instruction
-    DEALLOCATE instruction
+    CLOSE instruction;
+    DEALLOCATE instruction;
     ------------------------------------------------------------------------------
     
     ------------------------------------------------------------------------------
     SELECT Answer = STRING_AGG(RIGHT(s.Items1, 1), '') WITHIN GROUP (ORDER BY s.Stack)
-    FROM #stacks s
+    FROM #stacks s;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
     SELECT Answer = STRING_AGG(RIGHT(s.Items2, 1), '') WITHIN GROUP (ORDER BY s.Stack)
-    FROM #stacks s
+    FROM #stacks s;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
