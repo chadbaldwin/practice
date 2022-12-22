@@ -58,12 +58,9 @@
 ------------------------------------------------------------------------------
     SELECT Answer = SUM(x.Val)
     FROM (
-        SELECT x.ID, x.Val
-            , rn = ROW_NUMBER() OVER (PARTITION BY x.GroupID, x.Val ORDER BY x.ID)
-        FROM (
-            SELECT DISTINCT d.ID, d.GroupID, d.Val
-            FROM #data d
-        ) x
+        SELECT DISTINCT d.GroupID, d.Val
+            , rn = DENSE_RANK() OVER (PARTITION BY d.GroupID, d.Val ORDER BY d.ID)
+        FROM #data d
     ) x
     WHERE rn = 3
 ------------------------------------------------------------------------------
