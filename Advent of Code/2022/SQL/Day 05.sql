@@ -148,6 +148,8 @@
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
+    -- Part 2 simply involved adding a second set of updates to the cursor. Rather than reversing the order of the moves
+    -- we can simply just pick them up as blocks and keep the order.
     SELECT Answer = STRING_AGG(RIGHT(s.Items2, 1), '') WITHIN GROUP (ORDER BY s.Stack)
     FROM #stacks s;
 ------------------------------------------------------------------------------
