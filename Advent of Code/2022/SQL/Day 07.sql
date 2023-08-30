@@ -9,7 +9,7 @@
     IF (@UseSampleData = 1)
     BEGIN;
         RAISERROR('Sample data',0,1) WITH NOWAIT;
-        INSERT INTO #rawdata (ID, Val) VALUES (1,'$ cd /'),(2,'$ ls'),(3,'dir a'),(4,'14848514 b.txt'),(5,'8504156 c.dat'),(6,'dir d'),(7,'$ cd a'),(8,'$ ls'),(9,'dir e'),(10,'29116 f'),(11,'2557 g'),(12,'62596 h.lst'),(13,'$ cd e'),(14,'$ ls'),(15,'584 i'),(16,'$ cd ..'),(17,'$ cd ..'),(18,'$ cd d'),(19,'$ ls'),(20,'4060174 j'),(21,'8033020 d.log'),(22,'5626152 d.ext'),(23,'7214296 k')
+        INSERT INTO #rawdata (ID, Val) VALUES (1,'$ cd /'),(2,'$ ls'),(3,'dir a'),(4,'14848514 b.txt'),(5,'8504156 c.dat'),(6,'dir d'),(7,'$ cd a'),(8,'$ ls'),(9,'dir e'),(10,'29116 f'),(11,'2557 g'),(12,'62596 h.lst'),(13,'$ cd e'),(14,'$ ls'),(15,'584 i'),(16,'$ cd ..'),(17,'$ cd ..'),(18,'$ cd d'),(19,'$ ls'),(20,'4060174 j'),(21,'8033020 d.log'),(22,'5626152 d.ext'),(23,'7214296 k');
     END;
     ELSE
     BEGIN;
@@ -31,54 +31,71 @@
 ------------------------------------------------------------------------------
 -- Parse raw input data
 ------------------------------------------------------------------------------
-    DECLARE @FilePattern nvarchar(100) = N'^(\d+) (.+)';
-
-    DROP TABLE IF EXISTS #data
-    SELECT r.ID, x.ChangeDir, x.FileSize, x.[FileName]
+    DROP TABLE IF EXISTS #data; --SELECT * FROM #data
+    SELECT r.ID, r.Val
+        , ChangeDir     = CASE
+                            WHEN r.Val = '$ cd /'    THEN '{Root}'
+                            WHEN r.Val LIKE '$ cd %' THEN SUBSTRING(r.Val, 6, 200)
+                            ELSE NULL
+                          END
+        , FileSize      = CONVERT(int, IIF(x.IsFileListing = 1,      LEFT(r.Val, CHARINDEX(' ', r.Val)-1)     , NULL))
+        , [FileName]    =              IIF(x.IsFileListing = 1, SUBSTRING(r.Val, CHARINDEX(' ', r.Val)+1, 200), NULL)
     INTO #data
     FROM #rawdata r
-        CROSS APPLY (
-            SELECT ChangeDir    = IIF(r.Val LIKE '$ cd %', SUBSTRING(r.Val, 6, 200), NULL)
-                ,  FileSize     = CONVERT(int, IIF(dbo.ISREGEXMATCH(r.Val, @FilePattern) = 1, dbo.REPLACE_REGEX(r.Val, @FilePattern, '$1'), NULL))
-                ,  [FileName]   = IIF(dbo.ISREGEXMATCH(r.Val, @FilePattern) = 1, dbo.REPLACE_REGEX(r.Val, @FilePattern, '$2'), NULL)
-        ) x
-    WHERE dbo.ISREGEXMATCH(r.Val, '^(\$ ls|dir )') = 0
+        CROSS APPLY (SELECT IsFileListing = IIF(LEFT(r.Val, 1) LIKE '[0-9]', 1, 0)) x
+    WHERE r.Val <> '$ ls'
+        AND r.Val NOT LIKE 'dir %';
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 1
 ------------------------------------------------------------------------------
-    DROP TABLE IF EXISTS #tmp;
-    SELECT y.ReducedFullPath, DirSize = SUM(r1.FileSize)
-    INTO #tmp
-    FROM #data r1
-        OUTER APPLY (
-            SELECT FullPath = REPLACE(CONCAT(STRING_AGG(r2.ChangeDir,'/') WITHIN GROUP (ORDER BY r2.ID),'/'),'//','/')
-            FROM #data r2
-            WHERE r2.ID <= r1.ID
-        ) x
-        CROSS APPLY (
-            SELECT ReducedFullPath  = dbo.uf_RecursiveRegexReplace(x.FullPath, '[a-z]+?/\.\./', '')
-        ) y
-    WHERE r1.FileSize IS NOT NULL
-    GROUP BY y.ReducedFullPath
+    DROP TABLE IF EXISTS #dirsize; --SELECT * FROM #dirsize;
+    WITH cte AS (
+        SELECT r1.ID, r1.Val, r1.ChangeDir, r1.[FileName], r1.FileSize, y.ReducedFullPath
+        --SELECT y.ReducedFullPath, r1.FileSize
+        FROM #data r1
+            OUTER APPLY (
+                SELECT FullPath = STRING_AGG(r2.ChangeDir,'/') WITHIN GROUP (ORDER BY r2.ID) + '/'
+                FROM #data r2
+                WHERE r2.ID <= r1.ID
+            ) x
+            CROSS APPLY (
+                SELECT ReducedFullPath  = dbo.uf_RecursiveRegexReplace(x.FullPath, N'[a-z]+?/\.\./', '')
+            ) y
+    )
+    SELECT c.ReducedFullPath, DirSize = SUM(c.FileSize)
+    INTO #dirsize
+    FROM cte c
+    GROUP BY c.ReducedFullPath;
 
-    SELECT Answer = SUM(x.RecursiveDirSize)
-    FROM #tmp t1
+    DROP TABLE IF EXISTS #recurDirSize;
+    SELECT t1.ReducedFullPath, t1.DirSize, x.RecursiveDirSize
+    INTO #recurDirSize
+    FROM #dirsize t1
         OUTER APPLY (
             SELECT RecursiveDirSize = SUM(t2.DirSize)
-            FROM #tmp t2
+            FROM #dirsize t2
             WHERE t2.ReducedFullPath LIKE t1.ReducedFullPath + '%'
         ) x
-    WHERE x.RecursiveDirSize <= 100000
+
+    SELECT Answer = SUM(x.RecursiveDirSize)
+    FROM #recurDirSize x
+    WHERE x.RecursiveDirSize <= 100000;
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Part 2
 ------------------------------------------------------------------------------
+    DECLARE @RootSize int;
+    SELECT @RootSize = RecursiveDirSize
+    FROM #recurDirSize
+    WHERE ReducedFullPath = '{Root}/'
 
--- Code here
-
+    SELECT TOP(1) Answer = RecursiveDirSize
+    FROM #recurDirSize
+    WHERE RecursiveDirSize >= 30000000 - (70000000 - @RootSize)
+    ORDER BY RecursiveDirSize
 ------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
