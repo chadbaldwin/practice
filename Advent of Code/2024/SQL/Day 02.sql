@@ -127,13 +127,14 @@ WHERE x.DiffTypeCount = 1 AND x.MinDiff >= 1 AND x.MaxDiff <= 3
         The report:
             1 3 2 4 5
         We would generate reports:
-            1 3 2 4 5
-            _ 3 2 4 5
-            1 _ 2 4 5
-            1 3 _ 4 5
-            1 3 2 _ 5
-            1 3 2 4 _
-        Then we run the code from Part 1 for each of those reports and take a count of all that pass the safe criteria.
+            1 3 2 4 5    (+2 -1 +2 +1) Unsafe
+            _ 3 2 4 5    (-1 +2 +1)    Unsafe
+            1 _ 2 4 5    (+1 +2 +1)    Safe
+            1 3 _ 4 5    (+2 +1 +1)    Safe
+            1 3 2 _ 5    (+2 -1 +3)    Unsafe
+            1 3 2 4 _    (+2 -1 +2)    Unsafe
+        Run the code from Part 1 for each of those reports and take a count of all that pass the safe criteria. In this case there's 2.
+		
         At the very end, we take a count of all reports that have at least 1 possible safe version.
 
         Yes, the code itself is ugly and hard to follow...but the goal of this is to find the answer, not write beautiful code :)
