@@ -104,14 +104,11 @@ FROM #rawdata r
 ------------------------------------------------------------------------------
 SELECT Answer = COUNT(*)
 FROM (
-    SELECT x.ReportID, MinDiff = MIN(ABS(x.Diff)), MaxDiff = MAX(ABS(x.Diff)), DiffTypeCount = COUNT(DISTINCT x.DiffSign)
+    SELECT x.ReportID, MinDiff = MIN(ABS(x.Diff)), MaxDiff = MAX(ABS(x.Diff)), DiffTypeCount = COUNT(DISTINCT SIGN(x.Diff))
     FROM (
-        SELECT x.ReportID, x.ReportValue, x.Diff, DiffSign = SIGN(x.Diff)
-        FROM (
-            SELECT d.ReportID, d.ReportValue
-                , Diff = d.ReportValue - LEAD(d.ReportValue) OVER (PARTITION BY d.ReportID ORDER BY d.ReportValueID)
-            FROM #data d
-        ) x
+        SELECT d.ReportID, d.ReportValue
+            , Diff = d.ReportValue - LEAD(d.ReportValue) OVER (PARTITION BY d.ReportID ORDER BY d.ReportValueID)
+        FROM #data d
     ) x
     GROUP BY x.ReportID
 ) x
@@ -134,7 +131,7 @@ WHERE x.DiffTypeCount = 1 AND x.MinDiff >= 1 AND x.MaxDiff <= 3
             1 3 2 _ 5    (+2 -1 +3)    Unsafe
             1 3 2 4 _    (+2 -1 +2)    Unsafe
         Run the code from Part 1 for each of those reports and take a count of all that pass the safe criteria. In this case there's 2.
-		
+
         At the very end, we take a count of all reports that have at least 1 possible safe version.
 
         Yes, the code itself is ugly and hard to follow...but the goal of this is to find the answer, not write beautiful code :)
@@ -145,17 +142,14 @@ FROM (SELECT DISTINCT ReportID FROM #data) x
     CROSS APPLY (
         SELECT SafeReportVersionCount = COUNT(*)
         FROM (
-            SELECT x.ReportAlternateVersionID, MinDiff = MIN(ABS(x.Diff)), MaxDiff = MAX(ABS(x.Diff)), DiffTypeCount = COUNT(DISTINCT x.DiffSign)
+            SELECT x.ReportAlternateVersionID, MinDiff = MIN(ABS(x.Diff)), MaxDiff = MAX(ABS(x.Diff)), DiffTypeCount = COUNT(DISTINCT SIGN(x.Diff))
             FROM (
-                SELECT x.ReportAlternateVersionID, x.ReportValue, x.Diff, DiffSign = SIGN(x.Diff)
-                FROM (
-                    SELECT ReportAlternateVersionID = gs.[value], d3.ReportValueID, d3.ReportValue
-                        , Diff = d3.ReportValue - LEAD(d3.ReportValue) OVER (PARTITION BY gs.[value] ORDER BY d3.ReportValueID)
-                    FROM #data d3
-                        CROSS JOIN GENERATE_SERIES(0, s.ReportSize) gs
-                    WHERE d3.ReportID = x.ReportID
-                        AND d3.ReportValueID <> gs.[value]
-                ) x
+                SELECT ReportAlternateVersionID = gs.[value], d3.ReportValueID, d3.ReportValue
+                    , Diff = d3.ReportValue - LEAD(d3.ReportValue) OVER (PARTITION BY gs.[value] ORDER BY d3.ReportValueID)
+                FROM #data d3
+                    CROSS JOIN GENERATE_SERIES(0, s.ReportSize) gs
+                WHERE d3.ReportID = x.ReportID
+                    AND d3.ReportValueID <> gs.[value]
             ) x
             GROUP BY x.ReportAlternateVersionID
         ) x
